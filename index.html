@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>В гостях у бабушки — игра с Яшей</title>
+<style>
+  :root { --bg: #fdf3e3; --card: #fffaf0; --ink: #5a3d2b; --warm: #ffd9a0;
+    --good: #66bb6a; --err: #e57373; --muted: #a08060; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--ink);
+    transition: background .6s; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 12px; }
+  .card { background: var(--card); border-radius: 22px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,.06); margin-bottom: 14px; }
+  h1 { text-align: center; font-size: 26px; margin: 6px 0 4px; }
+  h2 { margin: 6px 0 12px; font-size: 22px; text-align: center; }
+  .sub { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 10px; }
+  .dialog { display: flex; gap: 12px; align-items: flex-start; background: #fdf3e3; border-radius: 16px; padding: 12px; margin-bottom: 12px; }
+  .avatar { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid var(--warm); flex-shrink: 0; }
+  .speech { font-size: 18px; line-height: 1.45; }
+  button { margin: 6px 4px; padding: 14px 22px; font-size: 19px; border: 2px solid #d9a05e; border-radius: 16px;
+    background: #ffe9cf; color: var(--ink); cursor: pointer; }
+  button:active { transform: scale(.97); }
+  button.good { background: #c8e6c9 !important; border-color: var(--good) !important; }
+  button.bad { background: #ffcdd2 !important; border-color: var(--err) !important; }
+  .heroes3 { display: flex; justify-content: center; gap: 10px; margin: 10px 0; }
+  .heroes3 img { width: 74px; height: 74px; border-radius: 50%; border: 3px solid var(--warm); object-fit: cover; }
+  .row { display: flex; justify-content: center; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+  .optnum { flex: 1; max-width: 110px; text-align: center; font-size: 34px; font-weight: bold; padding: 12px 6px; }
+  .q { font-size: 21px; font-weight: bold; text-align: center; margin: 12px 4px; line-height: 1.35; }
+  .expr { text-align: center; font-size: 40px; font-weight: bold; color: #7b4a2a; margin: 4px 0 2px; letter-spacing: 2px; }
+  .buns { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 14px 0; padding: 16px;
+    background: linear-gradient(#f6e7d3, #f1dcc0); border-radius: 20px; }
+  .bun { width: 62px; height: 56px; position: relative; }
+  .bun .body { width: 56px; height: 46px; background: radial-gradient(circle at 35% 30%, #e8b06a, #c98a45);
+    border-radius: 50% 50% 46% 46%; box-shadow: inset 0 -4px 6px rgba(0,0,0,.12); }
+  .bun .fill { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-30%); width: 18px; height: 18px; border-radius: 50%; }
+  .fill.cap { background: #7cb342; } .fill.apple { background: #e53935; } .fill.plain { background: #fbc02d; }
+  .bun.eaten { opacity: .35; filter: grayscale(.8); }
+  .bun.new .body { background: radial-gradient(circle at 35% 30%, #ffd9a0, #e0a668); }
+  .shake { animation: sh .4s; } @keyframes sh { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  /* стол для этапа 2 */
+  .table { background: linear-gradient(#f7ecd8, #f0dfc0); border-radius: 22px; padding: 18px 14px; margin: 12px 0;
+    min-height: 130px; border: 3px solid #e3cfae; }
+  .items { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+  .it { font-size: 50px; line-height: 1; filter: drop-shadow(2px 3px 2px rgba(0,0,0,.15)); }
+  .it.gone { visibility: hidden; }
+  .optitem { font-size: 42px; padding: 8px 22px; }
+  .timer { text-align: center; font-size: 17px; color: var(--muted); margin: 6px 0; }
+  .stars { text-align: center; font-size: 34px; margin: 8px 0; letter-spacing: 6px; }
+  .topline { display:flex; justify-content: space-between; font-size:15px; color: var(--muted); margin-bottom: 8px; }
+  .bar { height: 10px; background: #eed9ba; border-radius: 6px; overflow: hidden; margin: 4px 0 2px; }
+  .bar i { display:block; height:100%; width:0%; background: #f0a45c; transition: width .5s; }
+  .phase { text-align:center; font-weight:bold; color:#b07b3a; margin: 2px 0 6px; }
+  .confetti { position: fixed; font-size: 26px; pointer-events: none; z-index: 9; animation: conf .9s ease-out forwards; }
+  @keyframes conf { from { opacity:1; transform: translateY(0) rotate(0); } to { opacity:0; transform: translateY(-90px) rotate(220deg); } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const IMG = { yasha: "images/yasha.jpg", balovashka: "images/balovashka.jpg", babushka: "images/babushka.jpg" };
+const content = document.getElementById("app");
+const TOTAL = 11;
+
+/* ===== аудио ===== */
+const audioCache = {};
+let curKind = null, voiceTimers = [], lastGood = -1, lastBad = -1;
+function stopAll() { voiceTimers.forEach(clearTimeout); voiceTimers = [];
+  for (const k in audioCache) { try { audioCache[k].pause(); audioCache[k].currentTime = 0; } catch (e) {} } curKind = null; }
+function play(path, delay) {
+  const doPlay = () => { stopAll(); curKind = "v"; try {
+    if (!audioCache[path]) audioCache[path] = new Audio(path);
+    const a = audioCache[path]; a.onended = () => curKind = null; a.currentTime = 0;
+    const pr = a.play(); if (pr && pr.catch) pr.catch(() => curKind = null);
+  } catch (e) { curKind = null; } };
+  if (delay) { const id = setTimeout(() => { voiceTimers = voiceTimers.filter(t => t !== id); doPlay(); }, delay); voiceTimers.push(id); }
+  else { voiceTimers.forEach(clearTimeout); voiceTimers = []; doPlay(); }
+}
+function fx(p) { stopAll(); curKind = "fx"; try {
+  if (!audioCache[p]) audioCache[p] = new Audio(p);
+  const a = audioCache[p]; a.onended = () => curKind = null; a.currentTime = 0;
+  const pr = a.play(); if (pr && pr.catch) pr.catch(() => curKind = null);
+} catch (e) { curKind = null; } }
+const GOOD = ["sounds/good_tochno.mp3","sounds/good_umnica.mp3","sounds/good_molodec.mp3"];
+const BAD = ["sounds/bad_ne_tochno.mp3","sounds/bad_pochti.mp3"];
+function praise() { let i = Math.floor(Math.random()*GOOD.length); if (i === lastGood) i = (i+1)%GOOD.length; lastGood = i; fx(GOOD[i]); }
+function oops() { let i = Math.floor(Math.random()*BAD.length); if (i === lastBad) i = (i+1)%BAD.length; lastBad = i; fx(BAD[i]); }
+
+/* ===== состояние ===== */
+let mode = "start"; // start | p1 | bridge | p2 | final
+let qi = 0, score = 0, errors = 0, locked = false, tried = 0;
+let items = [], hidden = "";
+
+function shuffle(a) { for (let i = a.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+
+/* этап 1: пирожки */
+const ROUNDS = [
+  { n: 5, qtext: "Сосчитай пирожки на подносе!", opts: [3,4,5,6], ans: 5, voice: "p02" },
+  { n: 8, qtext: "А теперь сосчитай пирожки на тарелке!", opts: [6,7,8,9], ans: 8, voice: "p03" },
+  { n: 6, added: 2, expr: "4 + 2", qtext: "Было 4 пирожка, бабушка испекла ещё 2.<br>Сколько всего стало?", opts: [4,5,6,7], ans: 6, voice: "p03" },
+  { n: 6, eaten: 1, expr: "6 − 1", qtext: "Было 6 пирожков, а Баловашка один съел! Сколько осталось?", opts: [4,5,6,7], ans: 5, voice: "p04" },
+  { n: 5, caps: 3, qtext: "Сосчитай пирожки С КАПУСТОЙ (с зелёной точкой)!", opts: [2,3,4,5], ans: 3, voice: "p05" },
+  { n: 8, added: 3, expr: "5 + 3", qtext: "Бабушка испекла 5 пирожков, а потом ещё 3.<br>Сколько всего стало?", opts: [6,7,8,9], ans: 8, voice: "p03" },
+];
+function buns(r) {
+  let arr = [];
+  for (let i = 0; i < r.n; i++) {
+    let fill = "plain";
+    if (r.caps && i < r.caps) fill = "cap"; else if (r.caps) fill = "apple";
+    const eaten = r.eaten && i >= r.n - r.eaten, isNew = r.added && i >= r.n - r.added;
+    arr.push(`<div class="bun ${eaten?"eaten":""} ${isNew?"new":""}"><div class="body"></div><div class="fill ${fill}"></div></div>`);
+  }
+  return arr.join("");
+}
+
+/* этап 2: что пропало */
+const POOL = ["🥟","🍎","🧶","🧸","🚗","🌸","🥄","📖","🍐","🧀"];
+const SIZES = [3, 4, 5, 5, 6];
+
+function doneCount() { return mode === "p1" ? qi : mode === "p2" ? 6 + qi : 0; }
+function render() {
+  content.innerHTML = "";
+  if (mode === "start") screenStart();
+  else if (mode === "p1") screenP1();
+  else if (mode === "bridge") screenBridge();
+  else if (mode === "p2") screenWatch();
+  else screenFinal();
+}
+function topBar(extra) {
+  const done = doneCount();
+  const pct = Math.round(done / TOTAL * 100);
+  return `<div class="topline"><span>Выполнено: ${done} | Осталось: ${TOTAL - done}</span><span>⭐ ${score}</span></div>
+    <div class="bar"><i style="width:${pct}%"></i></div>${extra || ""}`;
+}
+function screenStart() {
+  content.innerHTML = `
+    <div class="card" style="text-align:center">
+      <div class="heroes3"><img src="${IMG.babushka}"><img src="${IMG.balovashka}"><img src="${IMG.yasha}"></div>
+      <h1>🏡 В гостях у бабушки</h1>
+      <div class="sub">Два весёлых задания · Приключения с папильоном Яшей</div>
+      <p style="font-size:18px;margin:12px">Сегодня мы в гостях у бабушки! Сначала поможем посчитать пирожки, а потом поймаем воришку Баловашку!</p>
+      <button style="font-size:22px;padding:16px 34px" onclick="startGame()">▶ Начать приключение</button>
+    </div>`;
+}
+function startGame() {
+  mode = "p1"; qi = 0; score = 0; errors = 0; locked = false;
+  render();
+  play("sounds/p01.mp3", 300);
+}
+function screenP1() {
+  const r = ROUNDS[qi];
+  content.innerHTML = topBar('<div class="phase">Этап 1 — Бабушкины пирожки 🥟</div>') + `
+    <div class="card">
+      <div class="dialog"><img class="avatar" src="${IMG.balovashka}"><div class="speech">Баловашка: «Помоги мне посчитать пирожки!»</div></div>
+      <div class="q">${r.qtext}</div>
+      <div class="expr">${r.expr ? r.expr + " = ?" : ""}</div>
+      <div class="buns">${buns(r)}</div>
+      <div class="row" id="opts">
+        ${r.opts.map(o => `<button class="optnum" data-v="${o}" onclick="pickP1(${o}, this)">${o}</button>`).join("")}
+      </div>
+      <div id="fb" style="text-align:center;min-height:30px"></div>
+      <div id="nextWrap" style="text-align:center"></div>
+    </div>`;
+  if (qi === 0) play("sounds/p02.mp3", 500); else play("sounds/" + r.voice + ".mp3", 400);
+}
+function pickP1(v, btn) {
+  if (locked) return;
+  const r = ROUNDS[qi];
+  if (v === r.ans) {
+    btn.classList.add("good");
+    if (tried === 0) score++;
+    praise(); confetti();
+    const fb = document.getElementById("fb");
+    fb.innerHTML = '<div style="font-size:20px;color:#2e7d32;margin-top:8px">Отлично! ✅ ' + (r.expr ? r.expr + " = " + r.ans + "!" : "Правильно: " + r.ans + "!") + '</div>';
+    locked = true;
+    document.getElementById("nextWrap").innerHTML = '<button onclick="nextP1()">Дальше ➡</button>';
+  } else {
+    tried++; errors++;
+    btn.classList.add("bad"); oops();
+    const fb = document.getElementById("fb");
+    if (tried >= 2) {
+      fb.innerHTML = '<div style="font-size:18px;color:#c62828;margin-top:8px">Верный ответ: ' + (r.expr ? r.expr + " = " + r.ans : r.ans) + '</div>';
+      document.querySelectorAll(".optnum").forEach(b => { if (+b.dataset.v === r.ans) b.classList.add("good"); });
+      locked = true;
+      setTimeout(() => { document.getElementById("nextWrap").innerHTML = '<button onclick="nextP1()">Дальше ➡</button>'; }, 1400);
+    } else {
+      fb.innerHTML = '<div style="font-size:18px;color:#c62828;margin-top:8px">Почти! Попробуй ещё раз — сосчитай внимательнее!</div>';
+      btn.disabled = true;
+      setTimeout(() => btn.classList.remove("bad"), 800);
+    }
+  }
+}
+function nextP1() {
+  qi++; tried = 0; locked = false;
+  if (qi >= ROUNDS.length) { mode = "bridge"; render(); play("sounds/s01.mp3", 300); }
+  else render();
+}
+function screenBridge() {
+  content.innerHTML = topBar('<div class="phase">Этап 1 пройден! 🥟</div>') + `
+    <div class="card">
+      <div class="dialog"><img class="avatar" src="${IMG.yasha}"><div class="speech">Яша: «Замечательно посчитано! Но Баловашка опять шалит — он что-то спрятал со стола!»</div></div>
+      <p style="text-align:center;font-size:20px">Стань сыщиком и найди, чего не стало! 🔍</p>
+      <div style="text-align:center"><button onclick="startP2()">Дальше ➡</button></div>
+    </div>`;
+}
+function startP2() {
+  mode = "p2"; qi = 0; tried = 0; locked = false;
+  newP2Round();
+}
+function newP2Round() {
+  const n = SIZES[qi];
+  items = shuffle([...POOL]).slice(0, n);
+  hidden = items[Math.floor(Math.random() * n)];
+  locked = true;
+  screenWatch();
+  let t = 3 + n;
+  const iv = setInterval(() => {
+    t--;
+    const el = document.getElementById("tick");
+    if (el) el.textContent = "Запоминай… " + t;
+    if (t <= 0) { clearInterval(iv); showQuestionP2(); }
+  }, 1000);
+}
+function screenWatch() {
+  content.innerHTML = topBar('<div class="phase">Этап 2 — Что пропало? 🔍</div>') + `
+    <div class="card">
+      <div class="dialog"><img class="avatar" src="${IMG.balovashka}"><div class="speech">Баловашка: «Смотри внимательно и запоминай!»</div></div>
+      <div class="timer" id="tick">Запоминай…</div>
+      <div class="table"><div class="items">
+        ${items.map(it => `<span class="it">${it}</span>`).join("")}
+      </div></div>
+    </div>`;
+}
+function showQuestionP2() {
+  tried = 0; locked = false;
+  const options = shuffle([hidden, ...shuffle(POOL.filter(p => p !== hidden)).slice(0, 2)]);
+  content.innerHTML = topBar('<div class="phase">Этап 2 — Что пропало? 🔍</div>') + `
+    <div class="card">
+      <div class="dialog"><img class="avatar" src="${IMG.balovashka}"><div class="speech">Баловашка: «Ну-ка, догадайся!»</div></div>
+      <div class="q">Чего не стало?</div>
+      <div class="table"><div class="items">
+        ${items.map(it => it === hidden ? `<span class="it gone">${it}</span>` : `<span class="it">${it}</span>`).join("")}
+      </div></div>
+      <div class="row" id="opts">
+        ${options.map(o => `<button class="optitem" data-v="${o}" onclick="pickP2('${o}', this)">${o}</button>`).join("")}
+      </div>
+      <div id="fb" style="text-align:center;min-height:30px"></div>
+      <div id="nextWrap" style="text-align:center"></div>
+    </div>`;
+  play("sounds/s02.mp3", 400);
+}
+function pickP2(v, btn) {
+  if (locked) return;
+  if (v === hidden) {
+    btn.classList.add("good");
+    if (tried === 0) score++;
+    praise(); confetti();
+    document.getElementById("fb").innerHTML = '<div style="font-size:20px;color:#2e7d32;margin-top:8px">Точно! Это был ' + hidden + '! ✅</div>';
+    locked = true;
+    document.getElementById("nextWrap").innerHTML = '<button onclick="nextP2()">Дальше ➡</button>';
+  } else {
+    tried++; errors++;
+    btn.classList.add("bad"); oops();
+    const fb = document.getElementById("fb");
+    if (tried >= 2) {
+      fb.innerHTML = '<div style="font-size:18px;color:#c62828;margin-top:8px">Правильный ответ: ' + hidden + '!</div>';
+      document.querySelectorAll(".optitem").forEach(b => { if (b.dataset.v === hidden) b.classList.add("good"); });
+      locked = true;
+      play("sounds/s03.mp3", 200);
+      setTimeout(() => { document.getElementById("nextWrap").innerHTML = '<button onclick="nextP2()">Дальше ➡</button>'; }, 1800);
+    } else {
+      fb.innerHTML = '<div style="font-size:18px;color:#c62828;margin-top:8px">Присмотрись! Попробуй ещё раз!</div>';
+      play("sounds/s03.mp3", 200);
+      btn.disabled = true;
+      setTimeout(() => btn.classList.remove("bad"), 800);
+    }
+  }
+}
+function nextP2() {
+  qi++; tried = 0; locked = false;
+  if (qi >= SIZES.length) { mode = "final"; render(); }
+  else newP2Round();
+}
+function confetti() {
+  for (let i = 0; i < 10; i++) {
+    const e = document.createElement("div");
+    e.className = "confetti"; e.textContent = ["🎉","⭐","✨","🥟"][i % 4];
+    e.style.left = (10 + Math.random() * 80) + "%"; e.style.top = (30 + Math.random() * 40) + "%";
+    e.style.animationDelay = (Math.random() * .3) + "s";
+    document.body.appendChild(e);
+    setTimeout(() => e.remove(), 1300);
+  }
+}
+function screenFinal() {
+  const pct = Math.round(score / TOTAL * 100);
+  const stars = pct >= 100 ? 3 : pct >= 75 ? 2 : pct >= 50 ? 1 : 0;
+  content.innerHTML = `
+    <div class="card" style="text-align:center">
+      <div class="stars">${"⭐".repeat(stars) || "💛"}</div>
+      <h2>Миссия выполнена!</h2>
+      <div class="dialog" style="text-align:left"><img class="avatar" src="${IMG.babushka}">
+        <div class="speech">Бабушка: «${pct >= 75 ? "Какие замечательные помощники! И пирожки посчитали, и воришку поймали!" : pct >= 50 ? "Спасибо, дружок! Ещё чуть-чуть практики — и всё будет получаться!" : "Ты молодец, что старался! Заходи в гости ещё — вместе у нас всё получится!"}»</div></div>
+      <p style="font-size:19px">Верных сразу: <b>${score}</b> из ${TOTAL} · Ошибок: ${errors}</p>
+      <p style="font-size:16px;color:#a08060">${stars < 3 ? "До трёх звёзд не хватило " + (TOTAL - score) + " верных ответов" : "Бабушка очень довольна, а Баловашка обещает больше не шалить!"}</p>
+      <button style="font-size:20px;padding:14px 30px" onclick="startGame()">🔄 Играть снова</button>
+    </div>`;
+  play("sounds/p06.mp3", 300);
+  // вторая фраза — только ПОСЛЕ окончания первой (не обрываем!)
+  setTimeout(() => {
+    const a = audioCache["sounds/p06.mp3"];
+    if (a && !a.paused) {
+      a.onended = () => { curKind = null; play("sounds/s04.mp3", 300); };
+    } else {
+      play("sounds/s04.mp3", 300);
+    }
+  }, 800);
+}
+render();
+</script>
+</body>
+</html>
